@@ -1,9 +1,9 @@
 ---
 title: "HW4. T-tests and ANOVA"
 output:
+  pdf_document: default
   html_document: 
     theme: lumen
-  pdf_document: default
   highlight: tango
 ---
 
@@ -87,9 +87,26 @@ Use `mono_socio` dataframe to answer the following questions:
 5. How many left- and right-randed participants are present?
 
 The following functions from tidyverse can be usefult for this problem: `filter`, `group_by`, `count` and `distinct`. (Another approach is to use `pivot_wider`.)
+```
+No
+```
 
 ```{r}
+sprintf('Amount of participants: %s', length(unique(mono_socio[["ParticipantID"]])))
 
+gender <- mono_socio %>% filter(QuestionCategory=="sex")%>% count(Responce)
+sprintf('There are %s males and %s females', gender$n[[2]], gender$n[[1]])
+
+edu <- mono_socio %>% filter(QuestionCategory=="education") %>% distinct(Responce) 
+levels <- paste( unlist(c(edu[,1])), collapse=', ')
+sprintf('There are following education levels in df: %s', levels)
+
+edu2 <- mono_socio %>% filter(QuestionCategory=="education") %>% count(Responce)
+sprintf('%s participants of  %s level, %s of %s, %s of %s and %s of %s', edu2$n[[1]], edu2$Responce[[1]],
+        edu2$n[[2]], edu2$Responce[[2]], edu2$n[[3]], edu2$Responce[[3]], edu2$n[[4]], edu2$Responce[[4]])
+
+hand <- mono_socio %>% filter(QuestionCategory=="handedness") %>% count(Responce)
+sprintf('There are %s left-randed and %s right-randed participants', hand$n[[1]], hand$n[[2]])
 ```
 
 Compare you overview with that reported in Table 1 of the article. Sometimes replication data provided by authors does not allow on to reproduce their results. Let's look at another dataframe, `mono`, that contains results of experiment 1. 
@@ -105,15 +122,26 @@ Create a plot that shows the RT distribution in experiment 1 (all participants a
 ```{r}
 library(ggplot2)
 
-
+mono %>%
+  ggplot(aes(RT))+
+  geom_density(alpha = 0.4)+
+  geom_vline(aes(xintercept=mean(RT, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+  labs(title = "Reaction time density plot",
+       x = "Reaction time")
 ```
 
 Can we say that RT approximately follows normal distribution? Which features of RT distribution contradicts this assumption? (E.g. long left tail, long right tail, outliers, skewness, etc.) 
+
+```
+No, we can't say that RT approximately follows normal distribution. It's not symmetric about the mean, has long right tail because of outliers.
+```
 
 ### 1.3
 Normalise data applying the logarithm with base 10 (RTlog = log10(RT)). Use `mutate`.
 
 ```{r}
+mono <- mono %>% mutate(RTlog = log10(RT))
 
 ```
 
@@ -121,18 +149,33 @@ Normalise data applying the logarithm with base 10 (RTlog = log10(RT)). Use `mut
 Create a density plot that shows the RTlog distribution. 
 
 ```{r}
-
+mono %>%
+  ggplot(aes(RTlog))+
+  geom_density(alpha = 0.4)+
+  geom_vline(aes(xintercept=mean(RTlog, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+  labs(title = "Logarithmic reaction time density plot",
+       x = "Logarithmic reaction time")
 
 ```
 
 Can we say that RTlog approximately follows normal distribution? What features of RTlog distribution contradicts this assumption? (E.g. long left tail, long right tail, outliers, skewness, etc.) 
+
+
+```
+RTlog almost follows normal distribution, but it's still asymmetric, has skewness.
+```
 
 ### 1.5
 Give a summary of `RTlog` distribution (min, max, mean, median, standard deviation)
 
 ```{r}
 # hint: sd()
-
+sprintf('min: %s', min(mono$RTlog))
+sprintf('max: %s', max(mono$RTlog))
+sprintf('mean: %s', mean(mono$RTlog))
+sprintf('median: %s', median(mono$RTlog))
+sprintf('sd: %s', sd(mono$RTlog))
 
 ```
 
@@ -144,23 +187,23 @@ Filter out outliers. Remove from the table the following observations:
 Convert relevant variables to factors and save fitered data as `mono1`.
 
 ```{r}
-# mono1 <- 
-#  mono %>% 
-# filter here
-
-  
-  
-# select(ParticipantID, TypeOfStimuli, WordOrder, AcceptabilityJ = 
-# ResponseAcceptabilityJudgement, RTlog) %>% 
-#  mutate(ParticipantID = as.factor(ParticipantID),
-#    TypeOfStimuli = as.factor(TypeOfStimuli), 
-#         WordOrder = as.factor(WordOrder), 
-#         AcceptabilityJ = as.factor(AcceptabilityJ)) 
+mono1 <- 
+  mono %>% 
+  filter(RT >= 600) %>%
+  filter(abs(RTlog - mean(RTlog)) <= 3*sd(RTlog)) %>%
+  filter(TypeOfStimuli != 'FillerAcceptable') %>%
+  filter(TypeOfStimuli != 'FillerUnacceptable') %>%
+  select(ParticipantID, TypeOfStimuli, WordOrder, AcceptabilityJ = 
+  ResponseAcceptabilityJudgement, RTlog) %>% 
+  mutate(ParticipantID = as.factor(ParticipantID),
+         TypeOfStimuli = as.factor(TypeOfStimuli),
+         WordOrder = as.factor(WordOrder),
+         AcceptabilityJ = as.factor(AcceptabilityJ)) 
 ```
 ### 1.7 
 Calculate the number of observations in `mono1`.
 ```{r}
-
+nrow(mono1)
 ```
 
 ### 1.8
@@ -170,9 +213,14 @@ Hint: You can make a summary and use `geom_col()` (see example [here](https://r-
 Use either facet_wrap or facet_grid to make six plots.
 Note that we figures created in 1.8-1.0 may look different from what plotted in the article.
 
+
 ```{r}
 
-
+ggplot(mono1, aes(x = TypeOfStimuli, fill = AcceptabilityJ)) +
+  geom_bar(colour = "black", position = "dodge")+
+  facet_wrap(~WordOrder)+
+  labs(x = "Type Of Stimuli")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
@@ -180,6 +228,9 @@ Note that we figures created in 1.8-1.0 may look different from what plotted in 
 Reproduce Figure 2 from the article using ggplot.
 
 ```{r}
+ggplot(mono1, aes(x = WordOrder, fill = AcceptabilityJ)) +
+  geom_bar(colour = "black", position = "dodge")+
+  labs(x = "Word order")
 
 
 ```
@@ -188,7 +239,11 @@ Reproduce Figure 2 from the article using ggplot.
 Reproduce Figure 7 from the article using ggplot.
 
 ```{r}
-
+ggplot(mono1, aes(x = AcceptabilityJ, y = RTlog))+
+  geom_violin(aes(color = WordOrder), position = position_dodge(1) )+
+  geom_boxplot(aes(color = WordOrder), width = 0.25, position = position_dodge(1))+
+  labs(x = "Acceptability Judgement")
+  
 
 ```
 
@@ -196,8 +251,17 @@ Reproduce Figure 7 from the article using ggplot.
 For the same data, draw a lineplot for group means and standard errors using `ggline()`:
 
 ```{r}
+mono_sum <- mono1 %>%
+  group_by(WordOrder, AcceptabilityJ) %>%
+  dplyr::summarize(Mean = mean(RTlog, na.rm=TRUE), Sd = sd(RTlog, na.rm=TRUE))
+```
 
-
+```{r}
+ggplot(mono_sum, aes(x = AcceptabilityJ, y = Mean, group=WordOrder, color = WordOrder)) + 
+    geom_errorbar(aes(ymin=Mean-Sd, ymax=Mean+Sd), width=.1) +
+    geom_line() +
+    geom_point()+
+  labs(x = "Acceptability Judgement")
 ```
 
 ## 2. Difference in reaction time
@@ -219,7 +283,9 @@ Use `group_by` and `summarise` to find mean logarithm of reaction time for each 
 ```
 
 ```{r}
-
+mean_rtlog_long <- mono1 %>%
+  group_by(ParticipantID, WordOrder)%>%
+  dplyr::summarize(RTlog = mean(RTlog, na.rm=TRUE))
 
 
 ```
@@ -237,7 +303,8 @@ Use `pivot_wider` to spread values of `RTlog` in `mean_rtlog_long` into two colu
  3 02810ff2a65eae2b3e54ac57d906309d      3.46        3.36
  ```
 ```{r}
-
+mean_rtlog <- mean_rtlog_long %>%
+  pivot_wider(names_from = WordOrder, values_from = RTlog)
 
 ```
 
@@ -245,33 +312,51 @@ Use `pivot_wider` to spread values of `RTlog` in `mean_rtlog_long` into two colu
 Let us try to apply two-sample t-test to our data. Consider values in columns `Congruent` and `Incongruent` as two independent samples. Our null hypothesis is that these two samples are from populations with equal means. Alternative hypothesis: population mean for incongruate word order is larger (people need more time to ’parse’ it). Use `t.test` function to perform a test. Don't forget to specify `alternative`.
 
 ```{r}
-
+t.test(mean_rtlog$Congruent, mean_rtlog$Incongruent, alternative = "less", var.equal = FALSE)
 
 ```
 Would you reject null hypothesis (under 5% significance level) according to this test?
+```
+No, because p-value = 0.1772, which is more than 5%.
+```
 
 What claim about logarithms of reaction time for Congruent and Incongruent stimuli can you make according to this test?
+```
+They don't differ enough to reject null hypothesis.
+```
 
 ### 2.4. Paired t-test: manually
 To use paired t-test, let us find difference between logarithms of reaction time for each participant. Use `mutate` and add variable `diff` with aforementioned meaning to dataframe `mean_rtlog`. Save result as `mean_rtlog` again. Then compare mean of `diff` with 0 using 1-sample t-test. (Use appropriate alternative.)
 
 ```{r}
+mean_rtlog <- mean_rtlog %>%
+  mutate(diff = Congruent - Incongruent)
 
+t.test(mean_rtlog$diff, mu = 0, alternative = "less")
 
 ```
 
 Whould you reject null hypothesis?
+```
+Yes, because p-value = 0.009152, which is less than 5%.
+```
 
 What claim about logarithms of reaction time for Congruent and Incongruent stimuli can you make now?
+```
+According to this test we can claim that they differ enough to reject null hypothesis.
+```
 
 How can you interpret difference with the result of 2.3?
+```
+Paired t-test result differs from two-sample t-test result because person-to-person variability influences too much to our test in case of two-sample t-test. But that variability is not a objective of our study and paired t-test allows as to reduce its impact and focus on the effect that we are interested in.
+```
 
 #### 2.5. Paired t-test out of the box
 In fact, we can avoid manual calculation of difference and perform paired t-test using `t.test` function with parameter `paired = True`. Apply this function to your data and make sure you get the same result as in 2.4.
 
 ```{r}
 
-
+t.test(mean_rtlog$Congruent, mean_rtlog$Incongruent, alternative = "less", var.equal = FALSE, paired = TRUE)
 ```
 
 ## 3. Difference between conditions
@@ -291,7 +376,10 @@ Filter only observation with `Incongruent` word order, then find average logarit
 ```
 
 ```{r}
-
+incong_rtlog <- mono1 %>%
+  filter(WordOrder == 'Incongruent') %>%
+  group_by(ParticipantID, TypeOfStimuli) %>%
+  dplyr::summarize(RTlog = mean(RTlog, na.rm=TRUE))
 
 
 ```
@@ -300,8 +388,12 @@ Filter only observation with `Incongruent` word order, then find average logarit
 Use appropriate statistical test to answer the following question: are there any statistically significant difference in logarithm of reaction time for different conditions (types of stimuli)? Choose the test and provide justification for your choice. Provide your code, results and interpretation. What is your answer to the question?
 
 ```{r}
+res.aov <- aov(RTlog ~ TypeOfStimuli, data = incong_rtlog)
+summary(res.aov)
+```
 
-
+```
+According to the test p-value = 0.0125 which is less than 5%. It means that we should reject our null hypothesis and claim that there is statistically significant difference in logarithm of reaction time for different conditions.
 ```
 
 ### 3.3 Post-hoc analysis: which differences are significant?
@@ -310,7 +402,10 @@ If we compare means for several (more than two) groups and reject null hypothesi
 Apply `TukeyHSD` to the result of 3.2 and report which pair of conditions has statistically significant difference between logarithms of reaction time.
 
 ```{r}
-
+TukeyHSD(res.aov)
+```
+```
+ p-value for pair SubjectiveComment-Material-Shape-Color is less than 5% so it has statistically significant difference between logarithms of reaction time.
 ```
 
 ### R code cookbook
